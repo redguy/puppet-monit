@@ -1,0 +1,11 @@
+set httpd port 2812 allow localhost
+
+set daemon 10
+
+check process DAEMON1 with pidfile /tmp/DAEMON1.pid
+  start program = "$DIR/DAEMON1"
+  stop program = "/opt/local/bin/pkill DAEMON1"
+
+check process DAEMON2 with pidfile /tmp/DAEMON2.pid
+  start program = "$DIR/DAEMON2"
+  stop program = "/opt/local/bin/pkill DAEMON2"

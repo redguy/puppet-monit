@@ -1,0 +1,18 @@
+Implementation notes
+
+"enable/disable" not implemented. In puppet, "start/stop" is not considered persistent across reboot, therefore, puppet services have extra optional property "enabled/disabled" to represent whether it should come up at boot time. Monit on the other hand maintains "start/stop" state across reboot. I was considering mapping puppet's "enabled/disabled" state on monit's "monitored/not monitored", however, that could lead to some clashes in semantics. For example, in puppet, it is valid to have service in running/disabled state (and it makes sense). However, that would mean using running/not monitored state in monit and that's the problem: once a service goes to "not monitored" state, monit loses track of its current status. Puppet's "running/disabled" (with meaning "I want this service running now but not after next reboot") would be represented by monit's "not monitored" (meaning "Do not care about this service now and after reboot"). Therefore, to avoid confusion, enable/disable is not implemented. I believe that monit's persistence of service state should be enough for most purposes. If required, it can be easily added (see startcmd, stopcmd methods) but care must be taken about the differences in semantics.
+
+Potential trouble: monit has a problem reporting errors when stopping a process: For example, when no stop command is defined for a process, it prints an error message to its log file, but that's all, the "monit stop" commands prints no error message nor returns error code. The service happily goes to the "not monitored" status, even though the process is still running. One awkward fix is to analyze monit log file and check for the error message there. Another is to implement status checking independent on monit, however, that would not fix the problem, only detect it. Therefore, I think the best solution is just to have correct config files for monit with stop commands for all processes.
+
+Design decision: I use monit executable to talk to the monit daemon. Another option is to use http interface, however, that has a couple of problems. There's no formal specification of the http interface, so it can change at any time. On the other hand, command line arguments to monit executable are rather well specified on the man page and can be considered a stable interface. http interface requires extra parameter for the port the server is listening on. No such configuration is needed for the executable (as long as it is on PATH).
+
+Using http daemon would have some advantages: small performance bonus and possibility to talk to monit on different machine. Performance bonus is not really that much useful for this kind of application (not that many calls to the server anyway) and talking to different server is better accomplished by installing a puppet instance there. For these reasons, I consider using monit executable a better solution.
+
+
+Caveat: monit is very asynchronous, it may take some time for a change to propagate thru it (especially in direction from service to monit interface). This may interact with puppet's server mode. Although I did not study how exactly puppet server works, so I may be wrong here.
+
+
+Testing:
+
+a few unit tests in spec/unit/provider/service/monit_spec.rb
+Simple script in monit-test/randomtest.sh, it generates random states for two daemons, uses puppet to apply them and verifies daemon state afterwards using pgrep. Repeats this until interrupted. Simple, yet exhaustive way to test many different state changes.
